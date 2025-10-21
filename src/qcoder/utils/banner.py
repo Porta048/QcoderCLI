@@ -1,7 +1,6 @@
 """ASCII art banner for QCoder CLI."""
 
 import sys
-import os
 
 
 QCODER_BANNER = r"""

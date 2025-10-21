@@ -1,6 +1,5 @@
 """File and directory operations with AI assistance."""
 
-import os
 from pathlib import Path
 from typing import Optional
 import fnmatch

@@ -1,7 +1,6 @@
 """AI client for interacting with language models via OpenRouter."""
 
 from typing import Any, AsyncIterator, Iterator, Optional, overload, Literal
-import json
 import threading
 import tiktoken
 from openai import OpenAI, AsyncOpenAI
