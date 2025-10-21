@@ -4,7 +4,7 @@ An AI-powered command-line interface for code, chat, and automation - inspired b
 
 ## Features
 
-- **Interactive AI Chat**: Conversational terminal-based AI assistant powered by Qwen3-Coder
+- **Interactive AI Chat**: Conversational terminal-based AI assistant with your choice of AI model
 - **Code Understanding**: Natural language code explanations and suggestions
 - **File Manipulation**: AI-assisted file and directory operations
 - **Shell Command Execution**: Execute and explain shell commands with AI guidance
@@ -40,17 +40,24 @@ pip install qcoder
 
 ## Quick Start
 
-1. **Configure your API key**:
+1. **Get your OpenRouter API key**:
+   - Visit [https://openrouter.ai/keys](https://openrouter.ai/keys)
+   - Sign up and create a free API key
+
+2. **Configure your API key and model**:
 
 ```bash
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env and add your OpenRouter API key
+# Edit .env and configure:
 # OPENROUTER_API_KEY=your_api_key_here
+# DEFAULT_MODEL=google/gemini-2.0-flash-exp:free
 ```
 
-2. **Start a chat session**:
+Available models at [https://openrouter.ai/models](https://openrouter.ai/models)
+
+3. **Start a chat session**:
 
 ```bash
 qcoder chat
@@ -58,7 +65,7 @@ qcoder chat
 qcoder
 ```
 
-3. **Initialize a project**:
+4. **Initialize a project** (optional):
 
 ```bash
 cd your-project
@@ -73,7 +80,8 @@ Start an interactive AI conversation:
 
 ```bash
 qcoder chat
-qcoder chat --model qwen/qwen3-coder:free
+qcoder chat --model google/gemini-2.0-flash-exp:free
+qcoder chat --model openai/gpt-4-turbo
 qcoder chat --resume my_session
 ```
 

@@ -18,19 +18,22 @@ pip install -e .
 
 ## Configuration
 
-1. **Get an OpenRouter API key** (free):
-   - Visit https://openrouter.ai/
-   - Sign up and get your API key
+1. **Get an OpenRouter API key**:
+   - Visit [https://openrouter.ai/keys](https://openrouter.ai/keys)
+   - Sign up and create a free API key
 
 2. **Create a `.env` file**:
    ```bash
    cp .env.example .env
    ```
 
-3. **Add your API key** to `.env`:
+3. **Configure your API key and choose a model** in `.env`:
    ```
    OPENROUTER_API_KEY=your_key_here
+   DEFAULT_MODEL=google/gemini-2.0-flash-exp:free
    ```
+
+   Browse available models at [https://openrouter.ai/models](https://openrouter.ai/models)
 
 ## First Steps
 
@@ -107,7 +110,7 @@ qcoder conversations
 qcoder chat --resume conversation_name
 
 # Configure settings
-qcoder config --set model=qwen/qwen3-coder:free
+qcoder config --set model=google/gemini-2.0-flash-exp:free
 
 # View configuration
 qcoder config
@@ -213,9 +216,9 @@ qcoder workflow run workflow.yaml
 
 3. **Customize context** per project with `.qcoder/QCODER.md`
 
-4. **Set default model**:
+4. **Change model** (override default from .env):
    ```bash
-   qcoder config --set model=qwen/qwen3-coder:free
+   qcoder chat --model openai/gpt-4-turbo
    ```
 
 5. **Check logs** if something goes wrong:
@@ -260,4 +263,4 @@ pip install -e .
 - Create custom workflows for your projects
 - Contribute to the project!
 
-Happy coding with QCoder! 🚀
+Happy coding with QCoder!

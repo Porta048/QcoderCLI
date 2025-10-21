@@ -38,22 +38,24 @@ This will install two commands:
 
 ### Step 4: Get API Key
 
-1. Visit [OpenRouter](https://openrouter.ai/)
+1. Visit [OpenRouter API Keys](https://openrouter.ai/keys)
 2. Sign up for a free account
-3. Get your API key from the dashboard
-4. The Qwen3-Coder model is **completely free**
+3. Create an API key from the dashboard
 
-### Step 5: Configure API Key
+### Step 5: Configure API Key and Model
 
-Create a `.env` file in your home directory or project:
+Create a `.env` file in the project directory:
 
 ```bash
 # Copy the example
 cp .env.example .env
 
-# Edit and add your key
+# Edit and configure:
 # OPENROUTER_API_KEY=your_actual_key_here
+# DEFAULT_MODEL=google/gemini-2.0-flash-exp:free
 ```
+
+Choose your preferred model from [OpenRouter Models](https://openrouter.ai/models)
 
 Or set as environment variable:
 
