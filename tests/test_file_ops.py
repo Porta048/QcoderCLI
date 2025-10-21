@@ -355,13 +355,13 @@ class TestFileOperationsProcessWithAI:
     def test_process_with_ai_invalid_path(
         self, mock_ai_client: Mock, temp_project_dir: Path
     ) -> None:
-        """Test processing invalid path raises error."""
+        """Test processing non-existent path raises FileNotFoundError."""
         with patch("qcoder.modules.file_ops.get_ai_client", return_value=mock_ai_client):
             with patch("qcoder.modules.file_ops.Console"):
                 file_ops = FileOperations()
                 invalid_path = temp_project_dir / "nonexistent_dir"
 
-                with pytest.raises(ValueError):
+                with pytest.raises(FileNotFoundError):
                     file_ops.process_with_ai(invalid_path, "analyze")
 
 

@@ -149,7 +149,14 @@ class FileOperations:
         """
         path_str = str(path)
         for pattern in self.ignore_patterns:
-            if fnmatch.fnmatch(path_str, pattern) or fnmatch.fnmatch(path.name, pattern):
+            # Check if pattern matches the filename
+            if fnmatch.fnmatch(path.name, pattern):
+                return True
+            # Check if pattern matches the full path
+            if fnmatch.fnmatch(path_str, pattern):
+                return True
+            # Check if pattern appears as a path component
+            if pattern in path.parts:
                 return True
         return False
 
@@ -347,7 +354,15 @@ class FileOperations:
 
         Returns:
             AI response or transformed content.
+
+        Raises:
+            FileNotFoundError: If path does not exist.
+            ValueError: If path is neither a file nor a directory.
         """
+        # Check if path exists
+        if not path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+
         # Check if it's a transformation or analysis request
         transformation_keywords = [
             "add",

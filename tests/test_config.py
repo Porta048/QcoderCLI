@@ -43,6 +43,7 @@ class TestConfigInitialization:
             expected = tmp_path / ".qcoder"
             assert config.config_dir == expected
 
+    @pytest.mark.skipif(os.name == "nt", reason="Unix test skipped on Windows")
     @patch("qcoder.core.config.Path.home")
     def test_default_config_dir_unix(self, mock_home: Mock, tmp_path: Path) -> None:
         """Test default config directory on Unix-like systems."""
@@ -59,7 +60,7 @@ class TestConfigInitialization:
         config = Config(config_dir=temp_config_dir)
 
         assert config.global_config is not None
-        assert config.global_config.get("api_key") == "config-api-key"
+        assert config.global_config.get("api_key") == "sk-or-v1-testconfigapikey12345678"
         assert config.global_config.get("model") == "custom-model"
 
     def test_config_handles_missing_yaml_files(self, temp_config_dir: Path) -> None:
@@ -76,8 +77,8 @@ class TestConfigInitialization:
         config = Config(config_dir=temp_config_dir)
 
         assert config.global_context
-        assert "Test context file" in config.global_context
-        assert "# Key Information" in config.global_context
+        assert "This is a test context file" in config.global_context
+        assert "## Key Information" in config.global_context
 
 
 class TestConfigGet:
@@ -157,23 +158,30 @@ class TestConfigProperties:
     ) -> None:
         """Test api_key property retrieves from config."""
         config = Config(config_dir=temp_config_dir)
-        assert config.api_key == "config-api-key"
+        assert config.api_key == "sk-or-v1-testconfigapikey12345678"
 
     def test_api_key_property_from_env(self, temp_config_dir: Path) -> None:
         """Test api_key property retrieves from environment."""
-        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "env-api-key"}):
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-v1-testenvapikey12345678"}):
             config = Config(config_dir=temp_config_dir)
-            assert config.api_key == "env-api-key"
+            assert config.api_key == "sk-or-v1-testenvapikey12345678"
 
     def test_api_key_property_raises_when_missing(
         self, temp_config_dir: Path
     ) -> None:
         """Test api_key property raises ValueError when not configured."""
-        with patch.dict(os.environ, {}, clear=True):
-            config = Config(config_dir=temp_config_dir)
-            with pytest.raises(ValueError) as exc_info:
-                _ = config.api_key
-            assert "API key not found" in str(exc_info.value)
+        # Mock load_dotenv to prevent loading from .env file
+        # and clear both possible environment variables
+        with patch("qcoder.core.config.load_dotenv"):
+            with patch.dict(os.environ, {}, clear=False):
+                # Remove any existing API key environment variables
+                os.environ.pop("QCODER_API_KEY", None)
+                os.environ.pop("OPENROUTER_API_KEY", None)
+
+                config = Config(config_dir=temp_config_dir)
+                with pytest.raises(ValueError) as exc_info:
+                    _ = config.api_key
+                assert "API key not found" in str(exc_info.value)
 
     def test_model_property(self, temp_config_dir: Path, sample_yaml_config: Path) -> None:
         """Test model property returns correct value."""
@@ -272,7 +280,7 @@ class TestConfigContext:
         context = config.get_context()
 
         assert "# Global Context" in context
-        assert "Test context file" in context
+        assert "This is a test context file" in context
 
     def test_get_context_combines_global_and_project(
         self, temp_config_dir: Path, temp_project_dir: Path, sample_context_file: Path

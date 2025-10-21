@@ -157,8 +157,12 @@ class TestCredentialHandling:
         """Test that config can use environment variables for secrets."""
         import os
 
+        # SECURITY: Use properly formatted test API key that matches OpenRouter format
+        # sk-or-v1- prefix + minimum 20 character alphanumeric key
+        test_api_key = "sk-or-v1-1234567890abcdefghijklmnopqrstuvwxyz"
+
         # Set env vars
-        os.environ["OPENROUTER_API_KEY"] = "env-key"
+        os.environ["OPENROUTER_API_KEY"] = test_api_key
         os.environ["GITHUB_TOKEN"] = "env-token"
 
         try:
@@ -171,8 +175,8 @@ class TestCredentialHandling:
             with patch("qcoder.core.config.Path.home", return_value=temp_config_dir):
                 config = Config(config_dir=temp_config_dir)
 
-                # Should use env var over file
-                assert config.api_key == "env-key"
+                # Should use env var over file and validate it properly
+                assert config.api_key == test_api_key
         finally:
             # Cleanup
             del os.environ["OPENROUTER_API_KEY"]
@@ -184,28 +188,36 @@ class TestNoUnsafeEval:
 
     def test_no_eval_in_file_operations(self) -> None:
         """Test that file operations don't use eval."""
+        import inspect
         from qcoder.modules import file_ops
 
-        source = file_ops.__dict__
+        # SECURITY: Check source code for eval() usage
+        # Get the actual source code of the module
+        source_code = inspect.getsource(file_ops)
 
-        # Check that eval is not in the module's functions
-        assert "eval" not in str(source)
+        # Check for eval() function calls in source code
+        # This is more accurate than checking __dict__ which includes builtins
+        assert "eval(" not in source_code, "eval() found in file_ops source code"
 
     def test_no_eval_in_config(self) -> None:
         """Test that config doesn't use eval."""
+        import inspect
         from qcoder.core import config
 
-        source = config.__dict__
+        # SECURITY: Check source code for eval() usage
+        source_code = inspect.getsource(config)
 
-        assert "eval" not in str(source)
+        assert "eval(" not in source_code, "eval() found in config source code"
 
     def test_no_exec_in_shell(self) -> None:
         """Test that shell module doesn't use exec()."""
+        import inspect
         from qcoder.modules import shell
 
-        source = shell.__dict__
+        # SECURITY: Check source code for exec() usage
+        source_code = inspect.getsource(shell)
 
-        assert "exec(" not in str(source)
+        assert "exec(" not in source_code, "exec() found in shell source code"
 
 
 class TestInputValidation:

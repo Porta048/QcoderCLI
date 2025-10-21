@@ -119,8 +119,14 @@ class TestShellExecutorExecution:
         with patch("qcoder.modules.shell.get_ai_client", return_value=mock_ai_client):
             with patch("qcoder.modules.shell.Console"):
                 with patch("qcoder.modules.shell.subprocess.run") as mock_run:
-                    executor = ShellExecutor()
+                    # Properly configure mock result
+                    mock_result = Mock()
+                    mock_result.stdout = "test output"
+                    mock_result.stderr = ""
+                    mock_result.returncode = 0
+                    mock_run.return_value = mock_result
 
+                    executor = ShellExecutor()
                     executor.execute("sleep 10", timeout=5)
 
                     # Verify timeout was passed
@@ -304,7 +310,10 @@ class TestShellExecutorAnalysis:
                 fix = executor.suggest_fix_for_error("find /invalid", "No such file or directory")
 
                 assert fix
-                assert "No such file" in mock_ai_client.chat.call_args[0][0]
+                # Check that error message is in the user message content
+                messages = mock_ai_client.chat.call_args[0][0]
+                user_message = next(msg["content"] for msg in messages if msg["role"] == "user")
+                assert "No such file or directory" in user_message
 
 
 class TestShellExecutorEdgeCases:
@@ -345,7 +354,7 @@ class TestShellExecutorEdgeCases:
                     assert "127" in output
 
     def test_execute_windows_uses_shell_true(self, mock_ai_client: Mock) -> None:
-        """Test that Windows execution uses shell=True."""
+        """Test that Windows execution uses secure command parsing."""
         with patch("qcoder.modules.shell.get_ai_client", return_value=mock_ai_client):
             with patch("qcoder.modules.shell.Console"):
                 with patch("qcoder.modules.shell.subprocess.run") as mock_run:
@@ -359,8 +368,14 @@ class TestShellExecutorEdgeCases:
                     with patch.object(executor, "is_windows", True):
                         executor.execute("echo test")
 
+                    # Verify shell=False is used for security (not shell=True)
                     call_kwargs = mock_run.call_args[1]
-                    assert call_kwargs["shell"] is True
+                    assert call_kwargs["shell"] is False
+
+                    # Verify that Windows built-in commands use cmd.exe
+                    call_args = mock_run.call_args[0][0]
+                    assert call_args[0] == "cmd.exe"
+                    assert call_args[1] == "/c"
 
     def test_execute_unix_uses_shlex(self, mock_ai_client: Mock) -> None:
         """Test that Unix execution uses shlex parsing."""

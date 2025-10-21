@@ -113,7 +113,7 @@ def sample_yaml_config(temp_config_dir: Path) -> Path:
         Path to created config file.
     """
     config_data = {
-        "api_key": "config-api-key",
+        "api_key": "sk-or-v1-testconfigapikey12345678",
         "model": "custom-model",
         "log_level": "DEBUG",
         "max_context_length": 16000,

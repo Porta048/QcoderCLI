@@ -287,7 +287,7 @@ class TestAIClientTokenCounting:
     """Test token counting."""
 
     def test_count_tokens_estimation(self) -> None:
-        """Test token counting uses rough estimation."""
+        """Test token counting uses tiktoken for accurate counts."""
         with patch("qcoder.core.ai_client.OpenAI"):
             with patch("qcoder.core.ai_client.AsyncOpenAI"):
                 client = AIClient(api_key="key", model="model")
@@ -295,8 +295,9 @@ class TestAIClientTokenCounting:
                 text = "a" * 400  # 400 characters
                 tokens = client.count_tokens(text)
 
-                # Rough estimation: 1 token ≈ 4 characters
-                assert tokens == 100
+                # tiktoken accurately counts repeated characters
+                # A string of 400 'a's tokenizes to ~50 tokens
+                assert tokens == 50
 
     def test_count_tokens_empty_string(self) -> None:
         """Test counting tokens in empty string."""
@@ -314,7 +315,8 @@ class TestAIClientTokenCounting:
                 client = AIClient(api_key="key", model="model")
                 tokens = client.count_tokens("x")
 
-                assert tokens == 0  # 1 char // 4 = 0
+                # tiktoken accurately counts: single character = 1 token
+                assert tokens == 1
 
 
 class TestAIClientSystemPrompt:

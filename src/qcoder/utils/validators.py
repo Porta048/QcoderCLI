@@ -17,6 +17,9 @@ class ValidationError(ValueError):
 def validate_api_key(api_key: str) -> str:
     """Validate API key format.
 
+    Validates OpenRouter API keys which follow the format: sk-or-v1-{alphanumeric}
+    Does NOT make actual API calls - only validates format.
+
     Args:
         api_key: The API key to validate.
 
@@ -35,15 +38,30 @@ def validate_api_key(api_key: str) -> str:
     if not api_key:
         raise ValidationError("API key cannot be empty or whitespace only")
 
-    # Check minimum length
-    if len(api_key) < 20:
-        raise ValidationError(
-            f"API key is too short (got {len(api_key)} characters, expected at least 20)"
-        )
-
-    # Check for suspicious characters
+    # Check for whitespace first (before other validation)
     if any(char.isspace() for char in api_key):
         raise ValidationError("API key contains whitespace characters")
+
+    # Validate OpenRouter API key format: sk-or-v1-{key}
+    if not api_key.startswith("sk-or-v1-"):
+        raise ValidationError(
+            "API key must start with 'sk-or-v1-' (OpenRouter format)"
+        )
+
+    # Extract the key portion after the prefix
+    key_portion = api_key[9:]  # Skip 'sk-or-v1-'
+
+    # Check minimum length of the key portion
+    if len(key_portion) < 20:
+        raise ValidationError(
+            f"API key suffix is too short (got {len(key_portion)} characters, expected at least 20)"
+        )
+
+    # Validate key portion contains only safe characters (alphanumeric, hyphens, underscores)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", key_portion):
+        raise ValidationError(
+            "API key contains invalid characters. Only alphanumeric, hyphens, and underscores allowed."
+        )
 
     return api_key
 

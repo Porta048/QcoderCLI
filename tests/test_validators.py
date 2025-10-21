@@ -36,7 +36,7 @@ class TestValidateApiKey:
     def test_short_api_key(self):
         """Test that short API key raises error."""
         with pytest.raises(ValidationError, match="too short"):
-            validate_api_key("short123")
+            validate_api_key("sk-or-v1-short123")
 
     def test_api_key_with_whitespace(self):
         """Test that API key with internal whitespace raises error."""
@@ -48,6 +48,44 @@ class TestValidateApiKey:
         key_with_spaces = "  sk-or-v1-1234567890abcdefghijklmnopqrstuvwxyz  "
         result = validate_api_key(key_with_spaces)
         assert result == key_with_spaces.strip()
+
+    def test_api_key_validation_real_key(self):
+        """Test validation of real OpenRouter API key format."""
+        # Valid OpenRouter API key format: sk-or-v1-{64+ char alphanumeric}
+        real_format_keys = [
+            "sk-or-v1-" + "a" * 64,  # 64 character key
+            "sk-or-v1-1234567890abcdefghijklmnopqrstuvwxyz",  # Mixed alphanumeric
+            "sk-or-v1-ABC123XYZ789abc123xyz789ABC123XYZ789",  # Mixed case
+            "sk-or-v1-key_with_underscores_123",  # With underscores
+            "sk-or-v1-key-with-hyphens-456",  # With hyphens
+        ]
+        for key in real_format_keys:
+            result = validate_api_key(key)
+            assert result == key
+
+    def test_api_key_validation_invalid_key(self):
+        """Test validation rejects invalid API key formats."""
+        # Test wrong prefix
+        with pytest.raises(ValidationError, match="must start with 'sk-or-v1-'"):
+            validate_api_key("sk-1234567890abcdefghijklmnopqrstuvwxyz")
+
+        with pytest.raises(ValidationError, match="must start with 'sk-or-v1-'"):
+            validate_api_key("api-key-1234567890abcdefghijklmnopqrstuvwxyz")
+
+        # Test too short after prefix
+        with pytest.raises(ValidationError, match="too short"):
+            validate_api_key("sk-or-v1-short")
+
+        # Test invalid characters
+        with pytest.raises(ValidationError, match="invalid characters"):
+            validate_api_key("sk-or-v1-abc@def#ghij$klmn%opqrst")
+
+        # Test whitespace
+        with pytest.raises(ValidationError, match="contains whitespace"):
+            validate_api_key("sk-or-v1-abc def ghij klmn opqrst")
+
+        with pytest.raises(ValidationError, match="contains whitespace"):
+            validate_api_key("sk-or-v1-key with spaces in it!")
 
 
 class TestValidateTemperature:
