@@ -63,15 +63,15 @@ class Conversation:
         self.max_context_length = max_context_length or config.max_context_length
         self.messages: list[Message] = []
 
-        # Add system prompt if provided
-        if system_prompt:
-            self.add_message("system", system_prompt)
-
-        # Metadata
+        # Metadata - MUST be initialized before add_message()
         self.metadata: dict[str, Any] = {
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat(),
         }
+
+        # Add system prompt if provided
+        if system_prompt:
+            self.add_message("system", system_prompt)
 
     @staticmethod
     def _generate_id() -> str:

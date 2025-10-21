@@ -171,8 +171,8 @@ class Console:
             Progress context manager.
         """
         return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
+            SpinnerColumn(spinner_name="dots"),
+            TextColumn("[bold cyan]{task.description}[/bold cyan]"),
             console=self.console,
             transient=True,
         )

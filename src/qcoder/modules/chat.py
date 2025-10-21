@@ -11,6 +11,7 @@ from ..core.conversation import Conversation
 from ..core.ai_client import get_ai_client
 from ..core.config import get_config
 from ..utils.output import Console
+from ..utils.banner import print_banner
 
 
 class ChatSession:
@@ -59,6 +60,7 @@ class ChatSession:
 
     def start(self) -> None:
         """Start the interactive chat session."""
+        print_banner()
         self.console.rule("QCoder Chat Session", style="cyan")
         self.console.info(
             f"Using model: {self.ai_client.model}\n"
@@ -115,7 +117,8 @@ class ChatSession:
             messages = self.conversation.get_messages_for_api()
 
             # Show spinner while waiting
-            with self.console.spinner("Thinking..."):
+            with self.console.spinner() as progress:
+                progress.add_task("Generating response...", total=None)
                 response = self.ai_client.chat(messages, stream=False)
 
             return self.ai_client.extract_text_response(response)
