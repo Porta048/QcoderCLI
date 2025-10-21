@@ -1,10 +1,13 @@
 """Configuration management for QCoder CLI."""
 
 import os
+import threading
 from pathlib import Path
 from typing import Any, Optional
 import yaml
 from dotenv import load_dotenv
+
+from ..utils.validators import validate_api_key
 
 
 class Config:
@@ -126,10 +129,10 @@ class Config:
         """Get OpenRouter API key.
 
         Returns:
-            API key from environment or config.
+            Validated API key from environment or config.
 
         Raises:
-            ValueError: If API key is not configured.
+            ValueError: If API key is not configured or invalid.
         """
         key = self.get("api_key") or os.getenv("OPENROUTER_API_KEY")
         if not key:
@@ -137,7 +140,14 @@ class Config:
                 "OpenRouter API key not found. Set OPENROUTER_API_KEY environment variable "
                 "or configure it in ~/.qcoder/config.yaml"
             )
-        return key
+
+        try:
+            return validate_api_key(key)
+        except Exception as e:
+            raise ValueError(
+                f"Invalid OpenRouter API key: {e}. "
+                "Please check your API key configuration."
+            ) from e
 
     @property
     def model(self) -> str:
@@ -228,17 +238,25 @@ class Config:
             yaml.dump(config, f, default_flow_style=False)
 
 
-# Global config instance
+# Global config instance with thread-safe initialization
 _config: Optional[Config] = None
+_config_lock = threading.Lock()
 
 
 def get_config() -> Config:
-    """Get or create global config instance.
+    """Get or create global config instance with thread-safe initialization.
+
+    Uses double-checked locking pattern for thread safety.
 
     Returns:
         Global Config instance.
     """
     global _config
+    # First check (without lock for performance)
     if _config is None:
-        _config = Config()
+        # Acquire lock for initialization
+        with _config_lock:
+            # Second check (with lock to prevent race condition)
+            if _config is None:
+                _config = Config()
     return _config

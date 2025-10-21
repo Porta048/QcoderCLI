@@ -1,10 +1,10 @@
 """Conversation management with checkpoint support."""
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 from .config import get_config
 
@@ -16,14 +16,12 @@ class Message:
     role: str  # 'system', 'user', 'assistant'
     content: str
     timestamp: str = ""
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Set timestamp if not provided."""
         if not self.timestamp:
-            self.timestamp = datetime.utcnow().isoformat()
-        if self.metadata is None:
-            self.metadata = {}
+            self.timestamp = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary.
@@ -65,8 +63,8 @@ class Conversation:
 
         # Metadata - MUST be initialized before add_message()
         self.metadata: dict[str, Any] = {
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         # Add system prompt if provided
@@ -80,7 +78,7 @@ class Conversation:
         Returns:
             Unique conversation ID based on timestamp.
         """
-        return datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+        return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
 
     def add_message(
         self,
@@ -100,7 +98,7 @@ class Conversation:
         """
         message = Message(role=role, content=content, metadata=metadata)
         self.messages.append(message)
-        self.metadata["updated_at"] = datetime.utcnow().isoformat()
+        self.metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
         return message
 
     def get_messages_for_api(self, max_messages: Optional[int] = None) -> list[dict[str, str]]:
@@ -150,7 +148,7 @@ class Conversation:
         else:
             self.messages = []
 
-        self.metadata["updated_at"] = datetime.utcnow().isoformat()
+        self.metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     def save_checkpoint(self, name: Optional[str] = None) -> Path:
         """Save conversation to a checkpoint file.

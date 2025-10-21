@@ -323,10 +323,10 @@ def github(
 
 @main.command()
 @click.option(
-    "--global",
+    "--global-config",
     "global_scope",
     is_flag=True,
-    help="Show global configuration.",
+    help="Show or modify global configuration.",
 )
 @click.option(
     "--set",
@@ -338,8 +338,9 @@ def config(global_scope: bool, set_key: Optional[str]) -> None:
 
     Examples:
         qcoder config
-        qcoder config --global
+        qcoder config --global-config
         qcoder config --set model=qwen/qwen3-coder:free
+        qcoder config --global-config --set api_key=your-key
     """
     console = Console()
 

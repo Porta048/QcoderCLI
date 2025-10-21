@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -82,17 +83,25 @@ class QCoderLogger:
         self.logger.exception(message)
 
 
-# Global logger instance
+# Global logger instance with thread-safe initialization
 _logger: Optional[QCoderLogger] = None
+_logger_lock = threading.Lock()
 
 
 def get_logger() -> QCoderLogger:
-    """Get or create global logger instance.
+    """Get or create global logger instance with thread-safe initialization.
+
+    Uses double-checked locking pattern for thread safety.
 
     Returns:
         Global QCoderLogger instance.
     """
     global _logger
+    # First check (without lock for performance)
     if _logger is None:
-        _logger = QCoderLogger()
+        # Acquire lock for initialization
+        with _logger_lock:
+            # Second check (with lock to prevent race condition)
+            if _logger is None:
+                _logger = QCoderLogger()
     return _logger

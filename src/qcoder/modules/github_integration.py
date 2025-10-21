@@ -15,6 +15,7 @@ except ImportError:
 from ..core.ai_client import get_ai_client
 from ..core.config import get_config
 from ..utils.output import Console
+from ..utils.validators import validate_github_repo, ValidationError
 
 
 class GitHubIntegration:
@@ -31,6 +32,24 @@ class GitHubIntegration:
 
         # Check for GitHub CLI
         self.gh_cli_available = self._check_gh_cli()
+
+    def _validate_repo_format(self, repo: str) -> str:
+        """Validate and sanitize repository format.
+
+        Args:
+            repo: Repository string in format "owner/repo".
+
+        Returns:
+            Validated repository string.
+
+        Raises:
+            ValueError: If repository format is invalid.
+            ValidationError: If repository format fails validation.
+        """
+        try:
+            return validate_github_repo(repo)
+        except ValidationError as e:
+            raise ValueError(str(e)) from e
 
     def _check_gh_cli(self) -> bool:
         """Check if GitHub CLI (gh) is available.
@@ -106,7 +125,14 @@ class GitHubIntegration:
 
         Returns:
             AI review of the pull request.
+
+        Raises:
+            ValueError: If repo format is invalid.
         """
+        # SECURITY: Validate repo parameter before passing to gh CLI
+        if repo:
+            repo = self._validate_repo_format(repo)
+
         # Get PR details
         args = ["pr", "view", str(pr_number), "--json", "title,body,files,commits"]
         if repo:
@@ -155,7 +181,14 @@ class GitHubIntegration:
 
         Returns:
             AI analysis of the issue.
+
+        Raises:
+            ValueError: If repo format is invalid.
         """
+        # SECURITY: Validate repo parameter before passing to gh CLI
+        if repo:
+            repo = self._validate_repo_format(repo)
+
         # Get issue details
         args = [
             "issue",
@@ -335,7 +368,14 @@ class GitHubIntegration:
 
         Returns:
             Triage summary.
+
+        Raises:
+            ValueError: If repo format is invalid.
         """
+        # SECURITY: Validate repo parameter before passing to gh CLI
+        if repo:
+            repo = self._validate_repo_format(repo)
+
         # Get open issues
         args = ["issue", "list", "--limit", str(limit), "--json", "number,title,body"]
         if repo:

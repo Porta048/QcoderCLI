@@ -7,6 +7,7 @@ import fnmatch
 
 from ..core.ai_client import get_ai_client
 from ..utils.output import Console
+from ..utils.validators import validate_glob_pattern, ValidationError
 
 
 class FileOperations:
@@ -31,6 +32,66 @@ class FileOperations:
             ".DS_Store",
         ]
 
+        # SECURITY: Define allowed base directories for file operations
+        # This prevents path traversal attacks
+        self.allowed_base_dirs = [
+            Path.cwd().resolve(),  # Current working directory
+            Path.home().resolve(),  # User home directory
+        ]
+
+    def _validate_path(self, path: Path, operation: str = "access") -> Path:
+        """Validate path to prevent directory traversal attacks.
+
+        Args:
+            path: Path to validate.
+            operation: Operation being performed (for error messages).
+
+        Returns:
+            Resolved, validated path.
+
+        Raises:
+            ValueError: If path is outside allowed directories or contains dangerous patterns.
+        """
+        # SECURITY: Resolve path to absolute form and resolve symlinks
+        try:
+            resolved_path = path.resolve()
+        except (OSError, RuntimeError) as e:
+            raise ValueError(f"Invalid path for {operation}: {e}")
+
+        # SECURITY: Check for path traversal attempts
+        # Ensure resolved path is within allowed base directories
+        is_allowed = False
+        for base_dir in self.allowed_base_dirs:
+            try:
+                # Check if resolved_path is relative to base_dir
+                resolved_path.relative_to(base_dir)
+                is_allowed = True
+                break
+            except ValueError:
+                # Path is not relative to this base_dir, continue checking
+                continue
+
+        if not is_allowed:
+            raise ValueError(
+                f"Access denied: Path '{path}' is outside allowed directories. "
+                f"Allowed base directories: {[str(d) for d in self.allowed_base_dirs]}"
+            )
+
+        # SECURITY: Additional dangerous path checks
+        path_str = str(resolved_path).lower()
+
+        # Prevent access to sensitive system directories
+        dangerous_paths = [
+            "/etc/passwd", "/etc/shadow", "c:\\windows\\system32",
+            "/root/", "c:\\users\\administrator\\",
+        ]
+
+        for dangerous in dangerous_paths:
+            if dangerous in path_str:
+                raise ValueError(f"Access denied: Cannot {operation} sensitive system path")
+
+        return resolved_path
+
     def read_file(self, path: Path) -> str:
         """Read file contents.
 
@@ -42,18 +103,22 @@ class FileOperations:
 
         Raises:
             FileNotFoundError: If file doesn't exist.
+            ValueError: If path is invalid or outside allowed directories.
         """
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
+        # SECURITY: Validate path before reading
+        validated_path = self._validate_path(path, operation="read")
 
-        if not path.is_file():
-            raise ValueError(f"Not a file: {path}")
+        if not validated_path.exists():
+            raise FileNotFoundError(f"File not found: {validated_path}")
+
+        if not validated_path.is_file():
+            raise ValueError(f"Not a file: {validated_path}")
 
         try:
-            return path.read_text(encoding="utf-8")
+            return validated_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             # Try reading as binary and decode with error handling
-            content = path.read_bytes()
+            content = validated_path.read_bytes()
             return content.decode("utf-8", errors="replace")
 
     def write_file(self, path: Path, content: str) -> None:
@@ -62,9 +127,16 @@ class FileOperations:
         Args:
             path: Path to file.
             content: Content to write.
+
+        Raises:
+            ValueError: If path is invalid or outside allowed directories.
         """
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        # SECURITY: Validate path before writing
+        validated_path = self._validate_path(path, operation="write")
+
+        # Ensure parent directory exists
+        validated_path.parent.mkdir(parents=True, exist_ok=True)
+        validated_path.write_text(content, encoding="utf-8")
 
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored.
@@ -98,7 +170,17 @@ class FileOperations:
 
         Returns:
             List of file paths.
+
+        Raises:
+            ValidationError: If glob pattern is invalid.
         """
+        # Validate glob pattern
+        try:
+            pattern = validate_glob_pattern(pattern)
+        except ValidationError as e:
+            self.console.error(f"Invalid glob pattern: {e}")
+            raise
+
         files: list[Path] = []
 
         if root.is_file():
@@ -109,13 +191,19 @@ class FileOperations:
 
         glob_pattern = f"**/{pattern}" if recursive else pattern
 
-        for path in root.glob(glob_pattern):
-            if len(files) >= max_files:
-                self.console.warning(f"Reached maximum file limit ({max_files})")
-                break
+        try:
+            for path in root.glob(glob_pattern):
+                if len(files) >= max_files:
+                    self.console.warning(f"Reached maximum file limit ({max_files})")
+                    break
 
-            if path.is_file() and not self.should_ignore(path):
-                files.append(path)
+                if path.is_file() and not self.should_ignore(path):
+                    files.append(path)
+        except (ValueError, OSError) as e:
+            # Catch glob execution errors (e.g., invalid pattern syntax)
+            raise ValidationError(
+                f"Failed to process glob pattern '{pattern}': {e}"
+            ) from e
 
         return files
 

@@ -120,18 +120,49 @@ class WorkflowAutomation:
         if not command:
             raise ValueError("Shell step missing 'command' field")
 
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=step.get("timeout", 300),
-        )
+        # SECURITY: Never use shell=True to prevent command injection
+        # Parse command into argument list safely
+        import shlex
+        import platform
 
-        if result.returncode != 0 and step.get("fail_on_error", True):
-            raise RuntimeError(f"Command failed: {result.stderr}")
+        try:
+            # Use shlex to safely split command into arguments
+            # This prevents shell injection attacks
+            if isinstance(command, str):
+                # Platform-specific command splitting
+                if platform.system() == "Windows":
+                    # Windows: Use list mode or split carefully
+                    # For Windows, recommend using list format in workflows
+                    args = shlex.split(command, posix=False)
+                else:
+                    # Unix-like systems: POSIX-compliant splitting
+                    args = shlex.split(command)
+            elif isinstance(command, list):
+                # Already in safe list format
+                args = command
+            else:
+                raise ValueError("Command must be a string or list")
 
-        return result.stdout
+            # SECURITY: Execute without shell=True
+            result = subprocess.run(
+                args,
+                shell=False,  # Critical: prevents command injection
+                capture_output=True,
+                text=True,
+                timeout=step.get("timeout", 300),
+            )
+
+            if result.returncode != 0 and step.get("fail_on_error", True):
+                raise RuntimeError(f"Command failed: {result.stderr}")
+
+            return result.stdout
+
+        except ValueError as e:
+            raise ValueError(f"Invalid command format: {e}")
+        except FileNotFoundError:
+            raise RuntimeError(f"Command not found. Ensure the executable is in PATH.")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"Command timed out after {step.get('timeout', 300)} seconds")
 
     def _execute_ai_chat_step(self, step: dict[str, Any]) -> str:
         """Execute AI chat step.
@@ -200,8 +231,9 @@ class WorkflowAutomation:
         if not condition:
             raise ValueError("Conditional step missing 'condition' field")
 
-        # Simple condition evaluation (can be extended)
-        condition_met = eval(condition, {}, {})  # nosec - workflow files are trusted
+        # SECURITY: Use safe condition evaluation instead of eval()
+        # Only support simple boolean literals and basic comparisons
+        condition_met = self._evaluate_safe_condition(condition)
 
         if condition_met:
             return self._execute_step(step.get("then", {}))
@@ -210,6 +242,36 @@ class WorkflowAutomation:
             if else_step:
                 return self._execute_step(else_step)
             return None
+
+    def _evaluate_safe_condition(self, condition: str) -> bool:
+        """Safely evaluate a condition string without using eval().
+
+        Args:
+            condition: Condition string to evaluate.
+
+        Returns:
+            Boolean result of condition evaluation.
+
+        Raises:
+            ValueError: If condition contains unsafe operations.
+        """
+        # SECURITY: Whitelist approach - only allow safe literal values
+        # Strip whitespace for comparison
+        condition = condition.strip().lower()
+
+        # Allow simple boolean literals
+        if condition == "true":
+            return True
+        elif condition == "false":
+            return False
+
+        # For more complex conditions, recommend using step results or environment variables
+        # This prevents arbitrary code execution while maintaining workflow functionality
+        raise ValueError(
+            f"Unsafe or unsupported condition: '{condition}'. "
+            "Only 'true' and 'false' boolean literals are supported for security. "
+            "For complex conditions, use step results or environment checks in your workflow."
+        )
 
     def run_batch_processing(
         self,

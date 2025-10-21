@@ -7,10 +7,15 @@ from typing import Optional
 
 from ..core.ai_client import get_ai_client
 from ..utils.output import Console
+from ..utils.validators import validate_timeout
 
 
 class ShellExecutor:
     """Executes shell commands with AI assistance and safety checks."""
+
+    # Timeout configuration constants
+    DEFAULT_TIMEOUT = 300  # 5 minutes default timeout
+    MAX_TIMEOUT = 3600  # 1 hour maximum timeout
 
     def __init__(self) -> None:
         """Initialize shell executor."""
@@ -40,6 +45,32 @@ class ShellExecutor:
         """
         cmd_lower = command.lower()
         return any(pattern.lower() in cmd_lower for pattern in self.dangerous_patterns)
+
+    def _parse_windows_command(self, command: str) -> list[str]:
+        """Parse Windows command safely.
+
+        Args:
+            command: Command string to parse.
+
+        Returns:
+            List of command arguments.
+        """
+        # SECURITY: Windows shell built-ins require cmd.exe, but we can invoke it safely
+        # List of common Windows shell built-ins
+        windows_builtins = {
+            "cd", "dir", "copy", "move", "del", "type", "set", "echo",
+            "mkdir", "rmdir", "rename", "cls", "exit", "start"
+        }
+
+        # Parse command to check if it's a built-in
+        parts = shlex.split(command, posix=False)
+        if parts and parts[0].lower() in windows_builtins:
+            # For built-ins, we must use cmd.exe, but we pass args safely
+            # Use /c to execute command and exit
+            return ["cmd.exe", "/c"] + parts
+        else:
+            # For regular executables, parse normally
+            return parts
 
     def explain_command(self, command: str) -> str:
         """Get AI explanation of a shell command.
@@ -111,15 +142,21 @@ class ShellExecutor:
         Args:
             command: Command to execute.
             check_dangerous: Whether to check for dangerous commands.
-            timeout: Command timeout in seconds.
+            timeout: Command timeout in seconds. If None, uses DEFAULT_TIMEOUT.
             capture_output: Whether to capture and return output.
 
         Returns:
             Command output or execution status.
 
         Raises:
+            ValidationError: If timeout value is invalid.
             RuntimeError: If command execution fails.
         """
+        # Validate and set timeout
+        timeout = validate_timeout(
+            timeout, default=self.DEFAULT_TIMEOUT, maximum=self.MAX_TIMEOUT
+        )
+
         # Safety check
         if check_dangerous and self.is_dangerous(command):
             self.console.warning(f"Potentially dangerous command detected: {command}")
@@ -127,27 +164,25 @@ class ShellExecutor:
                 return "Command execution cancelled by user."
 
         try:
-            # Parse command based on OS
+            # SECURITY: Avoid shell=True to prevent command injection
+            # Parse command into safe argument list
             if self.is_windows:
-                # Windows: use shell=True for proper command parsing
-                result = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=capture_output,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
-                )
+                # Windows: Use shlex with posix=False for Windows-style parsing
+                # For shell built-ins (cd, set, etc.), we need to invoke cmd.exe explicitly
+                args = self._parse_windows_command(command)
             else:
-                # Unix-like: use shlex for proper parsing
+                # Unix-like: use shlex for POSIX-compliant parsing
                 args = shlex.split(command)
-                result = subprocess.run(
-                    args,
-                    capture_output=capture_output,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
-                )
+
+            # SECURITY: Execute without shell=True
+            result = subprocess.run(
+                args,
+                shell=False,  # Critical: prevents command injection
+                capture_output=capture_output,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
 
             # Format output
             output_parts = []

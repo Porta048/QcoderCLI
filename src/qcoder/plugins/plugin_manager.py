@@ -73,6 +73,61 @@ class PluginManager:
 
         return plugins
 
+    def _validate_plugin_safety(self, plugin_path: Path) -> bool:
+        """Perform basic safety validation on plugin before loading.
+
+        Args:
+            plugin_path: Path to plugin file.
+
+        Returns:
+            True if plugin passes basic safety checks.
+        """
+        # SECURITY: Perform static analysis to detect obvious malicious patterns
+        try:
+            content = plugin_path.read_text(encoding="utf-8")
+        except Exception as e:
+            self.console.error(f"Failed to read plugin file: {e}")
+            return False
+
+        # SECURITY: Check for dangerous code patterns
+        # These are indicators of potentially malicious behavior
+        dangerous_patterns = [
+            # System manipulation
+            "os.system(", "subprocess.call(", "subprocess.Popen(",
+            # File system manipulation outside expected scope
+            "shutil.rmtree(", "os.remove(", "os.unlink(",
+            # Network operations (could be legitimate, but suspicious)
+            "socket.socket(", "urllib.request.urlopen(",
+            # Code execution
+            "exec(", "eval(", "compile(",
+            # Module manipulation
+            "__import__(",
+        ]
+
+        found_dangerous = []
+        for pattern in dangerous_patterns:
+            if pattern in content:
+                found_dangerous.append(pattern)
+
+        if found_dangerous:
+            self.console.warning(
+                f"Plugin contains potentially dangerous code patterns: {plugin_path.name}\n"
+                f"Detected patterns: {', '.join(found_dangerous)}\n"
+                "This plugin may perform sensitive operations. "
+                "Review the code before loading."
+            )
+            # Return True but warn - allow user to decide
+            # In a production system, you might want to require explicit approval
+            return True
+
+        # SECURITY: Check plugin size - extremely large files might be suspicious
+        if plugin_path.stat().st_size > 1024 * 1024:  # 1MB
+            self.console.warning(
+                f"Plugin file is unusually large ({plugin_path.stat().st_size} bytes): {plugin_path.name}"
+            )
+
+        return True
+
     def load_plugin(self, plugin_path: Path) -> Optional[Plugin]:
         """Load a single plugin from path.
 
@@ -83,6 +138,11 @@ class PluginManager:
             Loaded Plugin instance or None if loading failed.
         """
         try:
+            # SECURITY: Validate plugin before loading
+            if not self._validate_plugin_safety(plugin_path):
+                self.console.warning(f"Plugin failed safety validation: {plugin_path}")
+                return None
+
             # Generate module name
             module_name = f"qcoder_plugin_{plugin_path.stem}"
 
@@ -94,6 +154,14 @@ class PluginManager:
 
             module = importlib.util.module_from_spec(spec)
             sys.modules[module_name] = module
+
+            # SECURITY: Display warning before executing untrusted plugin code
+            self.console.warning(
+                f"Loading plugin: {plugin_path.name}\n"
+                "WARNING: Plugins execute arbitrary Python code. "
+                "Only load plugins from trusted sources."
+            )
+
             spec.loader.exec_module(module)
 
             # Get plugin metadata
